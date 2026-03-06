@@ -47,18 +47,40 @@ export default function Dashboard() {
     e.preventDefault();
     if (!nombre.trim()) return;
     
-    await fetch('/api/personas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        nombre, 
-        almuerzo: estadoAlmuerzo === '' ? null : estadoAlmuerzo, 
-        limpieza: estadoLimpieza === '' ? null : estadoLimpieza,
-        rebotes: 0 
-      }),
-    });
-    setNombre(''); setEstadoAlmuerzo(''); setEstadoLimpieza(''); setShowAddForm(false);
-    fetchPersonas();
+    setLoading(true);
+    try {
+      // Usamos la fecha de "ahora" para que entren al final de la cola
+      const ahora = new Date().toISOString();
+
+      const res = await fetch('/api/personas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          nombre, 
+          rebotes: 0,
+          // Si no eliges "Le toca", les ponemos la fecha de hoy 
+          // para que no tengan prioridad inmediata
+          ultimo_almuerzo: estadoAlmuerzo === 'Le toca' ? ahora : ahora, 
+          ultima_limpieza: estadoLimpieza === 'Le toca' ? ahora : ahora,
+          veces_almuerzo: estadoAlmuerzo === 'Le toca' ? 1 : 0,
+          veces_limpieza: estadoLimpieza === 'Le toca' ? 1 : 0,
+          almuerzo: estadoAlmuerzo || null,
+          limpieza: estadoLimpieza || null,
+        }),
+      });
+
+      if (res.ok) {
+        setNombre(''); 
+        setEstadoAlmuerzo(''); 
+        setEstadoLimpieza(''); 
+        setShowAddForm(false);
+        await fetchPersonas();
+      }
+    } catch (e) {
+      console.error("Error:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const guardarEdicion = async () => {
@@ -85,11 +107,17 @@ export default function Dashboard() {
   const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
   const dateForInput = (d?: string | null) => d ? d.substring(0, 10) : '';
 
-  const renderBadge = (v?: string | null) => {
+const renderBadge = (v?: string | null) => {
     if (!v) return <span style={{ color: '#ccc', fontWeight: 500 }}>—</span>;
     const val = v.toLowerCase().trim();
-    if (val === 'le toca') return <span className="badge-toca">Le toca</span>;
-    if (val === 'no puede') return <span className="badge-nopuede">No puede</span>;
+    
+    if (val === 'le toca') {
+      return <span className="badge-toca">Le toca</span>;
+    }
+    if (val === 'no puede') {
+      return <span className="badge-nopuede">No puede</span>;
+    }
+    
     return <span style={{ color: '#888' }}>{v}</span>;
   };
 
@@ -183,13 +211,35 @@ export default function Dashboard() {
             </div>
 
             {showAddForm && (
-              <form onSubmit={agregarPersona} className="add-row">
-                <input className="add-input" placeholder="Nombre..." value={nombre} onChange={e => setNombre(e.target.value)} required style={{flex:1}} />
-                <select value={estadoAlmuerzo} onChange={e => setEstadoAlmuerzo(e.target.value)}><option value="">Almuerzo: —</option><option value="Le toca">Le toca</option><option value="No puede">No puede</option></select>
-                <select value={estadoLimpieza} onChange={e => setEstadoLimpieza(e.target.value)}><option value="">Limpieza: —</option><option value="Le toca">Le toca</option><option value="No puede">No puede</option></select>
-                <button type="submit" className="btn-primary">Guardar</button>
-              </form>
-            )}
+  <form onSubmit={agregarPersona} className="add-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '10px', background: '#fff5fb', padding: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#df30a4' }}>NOMBRE</label>
+      <input className="edit-input" placeholder="" value={nombre} onChange={e => setNombre(e.target.value)} required />
+    </div>
+    
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#df30a4' }}>ESTADO ALMUERZO</label>
+      <select className="edit-input" value={estadoAlmuerzo} onChange={e => setEstadoAlmuerzo(e.target.value)}>
+        <option value="">— Sin estado —</option>
+        <option value="Le toca">Le toca</option>
+        <option value="No puede">No puede</option>
+      </select>
+    </div>
+
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#df30a4' }}>ESTADO LIMPIEZA</label>
+      <select className="edit-input" value={estadoLimpieza} onChange={e => setEstadoLimpieza(e.target.value)}>
+        <option value="">— Sin estado —</option>
+        <option value="Le toca">Le toca</option>
+        <option value="No puede">No puede</option>
+      </select>
+    </div>
+
+    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+      <button type="submit" className="btn-primary" style={{ width: '100%' }}>+ Crear Compañero</button>
+    </div>
+  </form>
+)}
 
             <div className="table-scroll">
               <table>
@@ -200,8 +250,8 @@ export default function Dashboard() {
                     <th>Estado Limp.</th>
                     <th>Últ. Almuerzo</th>
                     <th>Últ. Limpieza</th>
-                    <th className="sortable" onClick={() => toggleSort('almuerzo')}>Turnos Almuerzo. <SortIcon col="almuerzo" /></th>
-                    <th className="sortable" onClick={() => toggleSort('limpieza')}>Turnos Limpieza. <SortIcon col="limpieza" /></th>
+                    <th className="sortable" onClick={() => toggleSort('almuerzo')}>Turnos Almuerzo <SortIcon col="almuerzo" /></th>
+                    <th className="sortable" onClick={() => toggleSort('limpieza')}>Turnos Limpieza <SortIcon col="limpieza" /></th>
                     <th className="sortable" onClick={() => toggleSort('rebotes')}>Rebotes <SortIcon col="rebotes" /></th>
                     <th style={{textAlign:'right'}}>Acciones</th>
                   </tr>

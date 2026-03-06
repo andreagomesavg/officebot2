@@ -50,11 +50,38 @@ export async function PATCH(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { nombre } = await request.json();
-    // Insertamos solo el nombre, dejando que la DB use los defaults para el resto
-    await pool.query('INSERT INTO personas (nombre) VALUES (?)', [nombre]);
-    return NextResponse.json({ success: true });
+    const body = await request.json();
+    
+    // Extraemos las llaves y valores dinámicamente
+    const keys = Object.keys(body);
+    const values = Object.values(body);
+
+    if (keys.length === 0) {
+      return NextResponse.json({ error: 'Datos requeridos' }, { status: 400 });
+    }
+
+    // Preparamos los valores de fecha para MySQL si vienen en el body
+    const processedValues = values.map((val, index) => {
+      const key = keys[index];
+      if ((key === 'ultimo_almuerzo' || key === 'ultima_limpieza') && val) {
+        return new Date(val as string).toISOString().slice(0, 19).replace('T', ' ');
+      }
+      return val;
+    });
+
+    // Construimos la consulta: INSERT INTO personas (col1, col2) VALUES (?, ?)
+    const placeholders = keys.map(() => '?').join(', ');
+    const query = `INSERT INTO personas (${keys.join(', ')}) VALUES (${placeholders})`;
+    
+    const [result]: any = await pool.query(query, processedValues);
+
+    // IMPORTANTE: Devolvemos el ID recién creado para que el frontend lo sepa
+    return NextResponse.json({ 
+      id: result.insertId, 
+      success: true 
+    });
   } catch (error: any) {
+    console.error("Error en POST:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
