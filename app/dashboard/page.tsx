@@ -30,17 +30,23 @@ export default function Dashboard() {
 
   const fetchPersonas = async () => {
     setLoading(true);
-    const res = await fetch('/api/personas', { cache: 'no-store' });
-    const data = await res.json();
-    setPersonas(data);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/personas', { cache: 'no-store' });
+      const data = await res.json();
+      // Verificamos que sea un array antes de guardarlo
+      setPersonas(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Error cargando personas", e);
+      setPersonas([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const agregarPersona = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) return;
     
-    // Ahora creamos la persona exactamente con los valores del formulario
     await fetch('/api/personas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -57,8 +63,6 @@ export default function Dashboard() {
 
   const guardarEdicion = async () => {
     if (!editandoId) return;
-
-    // Enviamos el editForm tal cual está, sin sumar rebotes automáticamente
     await fetch('/api/personas', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -79,7 +83,6 @@ export default function Dashboard() {
   };
 
   const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
-  
   const dateForInput = (d?: string | null) => d ? d.substring(0, 10) : '';
 
   const renderBadge = (v?: string | null) => {
@@ -90,12 +93,14 @@ export default function Dashboard() {
     return <span style={{ color: '#888' }}>{v}</span>;
   };
 
-  const filtered = personas
+  // BLINDAJE: Usamos (personas || []) por si acaso
+  const filtered = (personas || [])
     .filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()))
-    .filter(p => filterAlmuerzo === 'all' ? true : filterAlmuerzo === 'con' ? p.veces_almuerzo > 0 : p.veces_almuerzo === 0)
-    .filter(p => filterLimpieza === 'all' ? true : filterLimpieza === 'con' ? p.veces_limpieza > 0 : p.veces_limpieza === 0)
+    .filter(p => filterAlmuerzo === 'all' ? true : filterAlmuerzo === 'con' ? (p.veces_almuerzo || 0) > 0 : (p.veces_almuerzo || 0) === 0)
+    .filter(p => filterLimpieza === 'all' ? true : filterLimpieza === 'con' ? (p.veces_limpieza || 0) > 0 : (p.veces_limpieza || 0) === 0)
     .sort((a: any, b: any) => {
-      let va = a[sortBy], vb = b[sortBy];
+      let va = a[sortBy] ?? '';
+      let vb = b[sortBy] ?? '';
       if (typeof va === 'string') va = va.toLowerCase();
       if (typeof vb === 'string') vb = vb.toLowerCase();
       return sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
@@ -140,6 +145,7 @@ export default function Dashboard() {
         .pagination-bar { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-top: 1px solid #f0f0f0; background: #fff; }
         .page-btn { border: 1px solid #e5e7eb; background: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #555; }
         .page-btn.active { background: #df30a4; color: #fff; border-color: #df30a4; }
+        .badge-rebote-rojo { background: #c5221f; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
       `}</style>
 
       <div className="page">
@@ -147,7 +153,7 @@ export default function Dashboard() {
           <div className="page-header">
             <div>
               <div className="page-title">Gestión de Equipo</div>
-              <div style={{color:'#888', fontSize:13}}>{personas.length} personas registradas</div>
+              <div style={{color:'#888', fontSize:13}}>{(personas || []).length} personas registradas</div>
             </div>
             <div style={{display:'flex', gap:10}}>
               <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
@@ -201,7 +207,9 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map(p => (
+                  {loading ? (
+                    <tr><td colSpan={9} style={{textAlign:'center', padding:40}}>Cargando...</td></tr>
+                  ) : paginated.map(p => (
                     <tr key={p.id}>
                       {editandoId === p.id ? (
                         <>
@@ -224,7 +232,7 @@ export default function Dashboard() {
                           <td style={{color:'#777'}}>{fmtDate(p.ultima_limpieza)}</td>
                           <td><span className={`badge-count ${p.veces_almuerzo > 0 ? 'active' : ''}`}>{p.veces_almuerzo}</span></td>
                           <td><span className={`badge-count ${p.veces_limpieza > 0 ? 'active' : ''}`}>{p.veces_limpieza}</span></td>
-                          <td>{p.rebotes > 0 ? <span className="badge-rebote-rojo" style={{background:'#c5221f', color:'white', padding:'2px 6px', borderRadius:4, fontSize:11}}>{p.rebotes}</span> : '—'}</td>
+                          <td>{p.rebotes > 0 ? <span className="badge-rebote-rojo">{p.rebotes}</span> : '—'}</td>
                           <td style={{textAlign:'right'}}>
                             <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
                               <button className="btn-ghost" onClick={() => { setEditandoId(p.id); setEditForm(p); }}>Editar</button>

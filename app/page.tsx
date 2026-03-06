@@ -3,6 +3,7 @@ import { Persona } from '@/types';
 import { useEffect, useState } from 'react';
 
 export default function SorteoPage() {
+  // Aseguramos que siempre sea un array al inicio
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,21 +22,32 @@ export default function SorteoPage() {
 
   const fetchPersonas = async () => {
     setLoading(true);
-    const res = await fetch('/api/personas', { cache: 'no-store' });
-    const data = await res.json();
-    setPersonas(data);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/personas', { cache: 'no-store' });
+      const data = await res.json();
+      // Si la data no es un array, ponemos uno vacío para evitar el crash
+      setPersonas(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Error al cargar personas:", e);
+      setPersonas([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // BLINDAJE: Usamos (personas || []) para que .filter nunca falle
   const obtenerTurnoActual = () => {
-    const almuerzos = personas.filter(p => p.almuerzo === 'Le toca');
-    const limpieza = personas.find(p => p.limpieza === 'Le toca') || null;
+    const lista = Array.isArray(personas) ? personas : [];
+    const almuerzos = lista.filter(p => p.almuerzo === 'Le toca');
+    const limpieza = lista.find(p => p.limpieza === 'Le toca') || null;
     return { almuerzos, limpieza };
   };
+  
   const turnoActual = obtenerTurnoActual();
 
-  const excluidosAlmuerzo = personas.filter(p => p.almuerzo === 'No puede');
-  const excluidosLimpieza = personas.filter(p => p.limpieza === 'No puede');
+  // BLINDAJE: También aquí para los excluidos
+  const excluidosAlmuerzo = (personas || []).filter(p => p.almuerzo === 'No puede');
+  const excluidosLimpieza = (personas || []).filter(p => p.limpieza === 'No puede');
 
   const sortSorteo = (a: Persona, b: Persona, tipo: 'almuerzo' | 'limpieza') => {
     const vecesA = tipo === 'almuerzo' ? a.veces_almuerzo : a.veces_limpieza;
@@ -100,7 +112,6 @@ export default function SorteoPage() {
         let changed = false;
         let patchData: any = { id: p.id };
 
-        // LÓGICA DE ALMUERZO
         const esNuevoAlmuerzo = almuerzoWinners.some(w => w.id === p.id);
         if (esNuevoAlmuerzo) {
           patchData.almuerzo = 'Le toca';
@@ -108,12 +119,10 @@ export default function SorteoPage() {
           patchData.ultimo_almuerzo = ahora;
           changed = true;
         } else if (p.almuerzo === 'Le toca') {
-          // SOLO limpiamos si tenía "Le toca". Los "No puede" se quedan intactos.
           patchData.almuerzo = null;
           changed = true;
         }
 
-        // LÓGICA DE LIMPIEZA
         const esNuevoLimpieza = limpiezaWinner?.id === p.id;
         if (esNuevoLimpieza) {
           patchData.limpieza = 'Le toca';
@@ -121,7 +130,6 @@ export default function SorteoPage() {
           patchData.ultima_limpieza = ahora;
           changed = true;
         } else if (p.limpieza === 'Le toca') {
-          // SOLO limpiamos si tenía "Le toca".
           patchData.limpieza = null;
           changed = true;
         }
@@ -163,7 +171,9 @@ export default function SorteoPage() {
           <p style={{color: '#666'}}>Turnos de equipo</p>
         </div>
 
-        {!sorteoActivo ? (
+        {loading ? (
+            <div style={{textAlign: 'center', padding: '50px', color: '#888'}}>Cargando datos del equipo...</div>
+        ) : !sorteoActivo ? (
           <>
             <div className="cards-grid">
               <div className="card">
