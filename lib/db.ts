@@ -1,21 +1,24 @@
 import mysql from 'mysql2/promise';
 
-// Definimos el tipo para que TS sepa qué es 'pool'
+// Definimos la interfaz para el objeto global
+interface GlobalWithPool extends Global {
+  pool?: mysql.Pool;
+}
+
+declare const global: GlobalWithPool;
+
 let pool: mysql.Pool;
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("Falta la variable DATABASE_URL");
+  throw new Error("DATABASE_URL no definida");
 }
 
-// Usamos el patrón global para evitar múltiples conexiones en desarrollo
-const globalForMysql = global as unknown as { pool: mysql.Pool };
-
-if (!globalForMysql.pool) {
-  globalForMysql.pool = mysql.createPool(connectionString);
+if (!global.pool) {
+  global.pool = mysql.createPool(connectionString);
 }
 
-pool = globalForMysql.pool;
+pool = global.pool;
 
 export default pool;
