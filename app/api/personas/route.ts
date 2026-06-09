@@ -6,7 +6,6 @@ import { RowDataPacket } from 'mysql2';
 
 export async function GET() {
   try {
-    // Traemos todo de la tabla personas
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM personas');
     return NextResponse.json(rows);
   } catch (error: any) {

@@ -16,3 +16,18 @@ export interface ResultadoSorteo {
   almuerzo: Persona[];
   limpieza: Persona;
 }
+
+export interface HistorialEntry {
+  id: number;
+  semana: string;          // YYYY-MM-DD (lunes de la semana)
+  tipo: 'almuerzo' | 'limpieza';
+  persona_id: number | null;
+  persona_nombre: string;
+  created_at: string;
+}
+
+export interface SemanaHistorial {
+  semana: string;
+  almuerzo: HistorialEntry[];
+  limpieza: HistorialEntry[];
+}

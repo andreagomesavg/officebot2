@@ -108,12 +108,9 @@ export default function Navbar() {
           >
             Personas
           </Link>
-          {/* Puedes añadir más enlaces aquí en el futuro */}
-          <Link 
-            href="#" 
-            className="nav-link"
-            style={{ opacity: 0.5, cursor: 'not-allowed' }}
-            title="Próximamente"
+          <Link
+            href="/calendario"
+            className={`nav-link ${pathname?.includes('/calendario') ? 'active' : ''}`}
           >
             Calendario
           </Link>
