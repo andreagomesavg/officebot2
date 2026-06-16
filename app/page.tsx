@@ -207,7 +207,13 @@ export default function SorteoPage() {
           patch.limpieza = null;
           changed = true;
         }
-        if (changed) requests.push(patchPersona(patch));
+        if (changed) requests.push(
+          fetch('/api/personas', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          })
+        );
       }
       await Promise.all(requests);
 
